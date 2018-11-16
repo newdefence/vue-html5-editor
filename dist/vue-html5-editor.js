@@ -1,7 +1,7 @@
 /**
  * Vue-html5-editor 1.1.0
- * https://github.com/PeakTai/vue-html5-editor
- * build at Fri Nov 16 2018 15:52:17 GMT+0800 (GMT+08:00)
+ * https://github.com/newdefence/vue-html5-editor
+ * build at Fri Nov 16 2018 17:53:51 GMT+0800 (GMT+08:00)
  */
 
 (function (global, factory) {
@@ -327,6 +327,8 @@ var dashboard$3 = {
             this.upload.errorMsg = msg;
         },
         process: function process() {
+            var this$1 = this;
+
             var component = this;
             var config = this.$options.module.config;
             // compatibility with older format
@@ -353,15 +355,15 @@ var dashboard$3 = {
             //     },
             // }
 
-            if (!config.upload && typeof config.server === 'string') {
-                config.upload = {url: config.server};
-            }
-            if (config.upload && !config.upload.url) {
-                config.upload = null;
-            }
-            if (config.upload && typeof config.fieldName === 'string') {
-                config.upload.fieldName = config.fieldName;
-            }
+            // if (!config.upload && typeof config.server === 'string') {
+            //     config.upload = {url: config.server}
+            // }
+            // if (config.upload && !config.upload.url) {
+            //     config.upload = null
+            // }
+            // if (config.upload && typeof config.fieldName === 'string') {
+            //     config.upload.fieldName = config.fieldName
+            // }
 
             // if (typeof config.compress === 'boolean') {
             //     config.compress = {
@@ -403,79 +405,111 @@ var dashboard$3 = {
             //     return
             // }
             // 上传服务器
-            component.uploadToServer(file);
+            config.http.get('/upload/token/get.json', { params: { fileName: file.name }, headers: { identity: config.identity } }).then(function (ref) {
+                var body = ref.body;
+
+                if (body.success) {
+                    component.uploadToServer(body.uploadInfo, file);
+                } else {
+                    this$1.setUploadError('request error');
+                }
+            }, function () {
+                this$1.setUploadError('request error');
+            });
         },
         insertBase64: function insertBase64(data) {
             this.$parent.execCommand(Command.INSERT_IMAGE, data);
         },
-        uploadToServer: function uploadToServer(file) {
+        uploadToServer: function uploadToServer(OSSConfig, file) {
             var this$1 = this;
 
             var config = this.$options.module.config;
 
             var formData = new FormData();
-            formData.append(config.upload.fieldName || 'image', file);
+            'OSSAccessKeyId,callback,expire,fileName,key,policy,signature'.split(',').forEach(function (key) {
+                formData.append(key, OSSConfig[key]);
+            });
+            formData.append('success_action_status', 200);
+            formData.append('file', file);
+            this.upload.status = 'progress';
 
-            if (typeof config.upload.params === 'object') {
-                Object.keys(config.upload.params).forEach(function (key) {
-                    var value = config.upload.params[key];
-                    if (Array.isArray(value)) {
-                        value.forEach(function (v) {
-                            formData.append(key, v);
-                        });
-                    } else {
-                        formData.append(key, value);
+            config.http.post(OSSConfig.host, formData).then(function (ref) {
+                var body = ref.body;
+
+                if (body.success) {
+                    this$1.$parent.execCommand(Command.INSERT_IMAGE, body.path);
+                    if (config.afterUpload) {
+                        config.afterUpload(body);
                     }
-                });
-            }
-
-            var xhr = new XMLHttpRequest();
-
-            xhr.onprogress = function (e) {
-                this$1.upload.status = 'progress';
-                if (e.lengthComputable) {
-                    this$1.upload.progressComputable = true;
-                    var percentComplete = e.loaded / e.total;
-                    this$1.upload.complete = (percentComplete * 100).toFixed(2);
                 } else {
-                    this$1.upload.progressComputable = false;
+                    this$1.setUploadError('图片上传失败');
                 }
-            };
+            }, function () {
+                this$1.setUploadError('图片上传失败');
+            }).finally(function () {
+                this$1.upload.status = 'ready';
+            });
 
-            xhr.onload = function () {
-                if (xhr.status >= 300) {
-                    this$1.setUploadError(("request error,code " + (xhr.status)));
-                    return
-                }
-
-                try {
-                    var url = config.uploadHandler(xhr.responseText);
-                    if (url) {
-                        this$1.$parent.execCommand(Command.INSERT_IMAGE, url);
-                    }
-                } catch (err) {
-                    this$1.setUploadError(err.toString());
-                } finally {
-                    this$1.upload.status = 'ready';
-                }
-            };
-
-            xhr.onerror = function () {
-                // find network info in brower tools
-                this$1.setUploadError('request error');
-            };
-
-            xhr.onabort = function () {
-                this$1.upload.status = 'abort';
-            };
-
-            xhr.open('POST', config.upload.url);
-            if (typeof config.upload.headers === 'object') {
-                Object.keys(config.upload.headers).forEach(function (k) {
-                    xhr.setRequestHeader(k, config.upload.headers[k]);
-                });
-            }
-            xhr.send(formData);
+            // if (typeof config.upload.params === 'object') {
+            //     Object.keys(config.upload.params).forEach((key) => {
+            //         const value = config.upload.params[key]
+            //         if (Array.isArray(value)) {
+            //             value.forEach((v) => {
+            //                 formData.append(key, v)
+            //             })
+            //         } else {
+            //             formData.append(key, value)
+            //         }
+            //     })
+            // }
+            //
+            // const xhr = new XMLHttpRequest()
+            //
+            // xhr.onprogress = (e) => {
+            //     this.upload.status = 'progress'
+            //     if (e.lengthComputable) {
+            //         this.upload.progressComputable = true
+            //         const percentComplete = e.loaded / e.total
+            //         this.upload.complete = (percentComplete * 100).toFixed(2)
+            //     } else {
+            //         this.upload.progressComputable = false
+            //     }
+            // }
+            //
+            // xhr.onload = () => {
+            //     if (xhr.status >= 300) {
+            //         this.setUploadError(`request error,code ${xhr.status}`)
+            //         return
+            //     }
+            //
+            //     try {
+            //         const url = config.uploadHandler(xhr.responseText)
+            //         if (url) {
+            //             this.$parent.execCommand(Command.INSERT_IMAGE, url)
+            //         }
+            //     } catch (err) {
+            //         this.setUploadError(err.toString())
+            //     } finally {
+            //         this.upload.status = 'ready'
+            //     }
+            // }
+            //
+            // xhr.onerror = () => {
+            //     // find network info in brower tools
+            //     this.setUploadError('request error')
+            // }
+            //
+            // xhr.onabort = () => {
+            //     this.upload.status = 'abort'
+            // }
+            //
+            // xhr.open('POST', config.upload.url)
+            // if (typeof config.upload.headers === 'object') {
+            //     Object.keys(config.upload.headers).forEach((k) => {
+            //         xhr.setRequestHeader(k, config.upload.headers[k])
+            //     })
+            // }
+            // xhr.send(formData)
         }
     }
 };
@@ -496,17 +530,17 @@ var image = {
         // height: 1600,
         // quality: 80,
         sizeLimit: 512 * 1024,// 512k
-        // upload: {
-        //     url: null,
-        //     headers: {},
-        //     params: {},
-        //     fieldName: {}
-        // },
-        compress: {
-            width: 1600,
-            height: 1600,
-            quality: 80
+        upload: {
+            url: null,
+            headers: {},
+            params: {},
+            fieldName: {}
         },
+        // compress: {
+        //     width: 1600,
+        //     height: 1600,
+        //     quality: 80
+        // },
         uploadHandler: function uploadHandler(responseText){
             var json = JSON.parse(responseText);
             return json.ok ? json.data : null

@@ -63,15 +63,15 @@ export default {
             //     },
             // }
 
-            if (!config.upload && typeof config.server === 'string') {
-                config.upload = {url: config.server}
-            }
-            if (config.upload && !config.upload.url) {
-                config.upload = null
-            }
-            if (config.upload && typeof config.fieldName === 'string') {
-                config.upload.fieldName = config.fieldName
-            }
+            // if (!config.upload && typeof config.server === 'string') {
+            //     config.upload = {url: config.server}
+            // }
+            // if (config.upload && !config.upload.url) {
+            //     config.upload = null
+            // }
+            // if (config.upload && typeof config.fieldName === 'string') {
+            //     config.upload.fieldName = config.fieldName
+            // }
 
             // if (typeof config.compress === 'boolean') {
             //     config.compress = {
@@ -113,77 +113,105 @@ export default {
             //     return
             // }
             // 上传服务器
-            component.uploadToServer(file)
+            config.http.get('/upload/token/get.json', { params: { fileName: file.name }, headers: { identity: config.identity } }).then(({ body }) => {
+                if (body.success) {
+                    component.uploadToServer(body.uploadInfo, file);
+                } else {
+                    this.setUploadError('request error');
+                }
+            }, () => {
+                this.setUploadError('request error');
+            });
         },
         insertBase64(data) {
             this.$parent.execCommand(Command.INSERT_IMAGE, data)
         },
-        uploadToServer(file) {
+        uploadToServer(OSSConfig, file) {
             const config = this.$options.module.config
 
             const formData = new FormData()
-            formData.append(config.upload.fieldName || 'image', file)
+            'OSSAccessKeyId,callback,expire,fileName,key,policy,signature'.split(',').forEach((key) => {
+                formData.append(key, OSSConfig[key]);
+            });
+            formData.append('success_action_status', 200);
+            formData.append('file', file);
+            this.upload.status = 'progress';
 
-            if (typeof config.upload.params === 'object') {
-                Object.keys(config.upload.params).forEach((key) => {
-                    const value = config.upload.params[key]
-                    if (Array.isArray(value)) {
-                        value.forEach((v) => {
-                            formData.append(key, v)
-                        })
-                    } else {
-                        formData.append(key, value)
+            config.http.post(OSSConfig.host, formData).then(({ body }) => {
+                if (body.success) {
+                    this.$parent.execCommand(Command.INSERT_IMAGE, body.path);
+                    if (config.afterUpload) {
+                        config.afterUpload(body);
                     }
-                })
-            }
-
-            const xhr = new XMLHttpRequest()
-
-            xhr.onprogress = (e) => {
-                this.upload.status = 'progress'
-                if (e.lengthComputable) {
-                    this.upload.progressComputable = true
-                    const percentComplete = e.loaded / e.total
-                    this.upload.complete = (percentComplete * 100).toFixed(2)
                 } else {
-                    this.upload.progressComputable = false
+                    this.setUploadError('图片上传失败');
                 }
-            }
+            }, () => {
+                this.setUploadError('图片上传失败');
+            }).finally(() => {
+                this.upload.status = 'ready';
+            });
 
-            xhr.onload = () => {
-                if (xhr.status >= 300) {
-                    this.setUploadError(`request error,code ${xhr.status}`)
-                    return
-                }
-
-                try {
-                    const url = config.uploadHandler(xhr.responseText)
-                    if (url) {
-                        this.$parent.execCommand(Command.INSERT_IMAGE, url)
-                    }
-                } catch (err) {
-                    this.setUploadError(err.toString())
-                } finally {
-                    this.upload.status = 'ready'
-                }
-            }
-
-            xhr.onerror = () => {
-                // find network info in brower tools
-                this.setUploadError('request error')
-            }
-
-            xhr.onabort = () => {
-                this.upload.status = 'abort'
-            }
-
-            xhr.open('POST', config.upload.url)
-            if (typeof config.upload.headers === 'object') {
-                Object.keys(config.upload.headers).forEach((k) => {
-                    xhr.setRequestHeader(k, config.upload.headers[k])
-                })
-            }
-            xhr.send(formData)
+            // if (typeof config.upload.params === 'object') {
+            //     Object.keys(config.upload.params).forEach((key) => {
+            //         const value = config.upload.params[key]
+            //         if (Array.isArray(value)) {
+            //             value.forEach((v) => {
+            //                 formData.append(key, v)
+            //             })
+            //         } else {
+            //             formData.append(key, value)
+            //         }
+            //     })
+            // }
+            //
+            // const xhr = new XMLHttpRequest()
+            //
+            // xhr.onprogress = (e) => {
+            //     this.upload.status = 'progress'
+            //     if (e.lengthComputable) {
+            //         this.upload.progressComputable = true
+            //         const percentComplete = e.loaded / e.total
+            //         this.upload.complete = (percentComplete * 100).toFixed(2)
+            //     } else {
+            //         this.upload.progressComputable = false
+            //     }
+            // }
+            //
+            // xhr.onload = () => {
+            //     if (xhr.status >= 300) {
+            //         this.setUploadError(`request error,code ${xhr.status}`)
+            //         return
+            //     }
+            //
+            //     try {
+            //         const url = config.uploadHandler(xhr.responseText)
+            //         if (url) {
+            //             this.$parent.execCommand(Command.INSERT_IMAGE, url)
+            //         }
+            //     } catch (err) {
+            //         this.setUploadError(err.toString())
+            //     } finally {
+            //         this.upload.status = 'ready'
+            //     }
+            // }
+            //
+            // xhr.onerror = () => {
+            //     // find network info in brower tools
+            //     this.setUploadError('request error')
+            // }
+            //
+            // xhr.onabort = () => {
+            //     this.upload.status = 'abort'
+            // }
+            //
+            // xhr.open('POST', config.upload.url)
+            // if (typeof config.upload.headers === 'object') {
+            //     Object.keys(config.upload.headers).forEach((k) => {
+            //         xhr.setRequestHeader(k, config.upload.headers[k])
+            //     })
+            // }
+            // xhr.send(formData)
         }
     }
 }
