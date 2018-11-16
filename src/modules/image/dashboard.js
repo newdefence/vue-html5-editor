@@ -1,4 +1,4 @@
-import lrz from 'lrz'
+// import lrz from 'lrz'
 import template from './dashboard.html'
 import Command from '../../range/command'
 
@@ -73,13 +73,13 @@ export default {
                 config.upload.fieldName = config.fieldName
             }
 
-            if (typeof config.compress === 'boolean') {
-                config.compress = {
-                    width: config.width,
-                    height: config.height,
-                    quality: config.quality
-                }
-            }
+            // if (typeof config.compress === 'boolean') {
+            //     config.compress = {
+            //         width: config.width,
+            //         height: config.height,
+            //         quality: config.quality
+            //     }
+            // }
 
             const file = this.$refs.file.files[0]
             if (file.size > config.sizeLimit) {
@@ -88,30 +88,30 @@ export default {
             }
             this.$refs.file.value = null
 
-            if (config.compress) {
-                config.compress.fieldName = config.upload && config.upload.fieldName
-                    ? config.upload.fieldName : 'image'
-                lrz(file, config.compress).then((rst) => {
-                    if (config.upload) {
-                        component.uploadToServer(rst.file)
-                    } else {
-                        component.insertBase64(rst.base64)
-                    }
-                }).catch((err) => {
-                    this.setUploadError(err.toString())
-                })
-                return
-            }
+            // if (config.compress) {
+            //     config.compress.fieldName = config.upload && config.upload.fieldName
+            //         ? config.upload.fieldName : 'image'
+            //     lrz(file, config.compress).then((rst) => {
+            //         if (config.upload) {
+            //             component.uploadToServer(rst.file)
+            //         } else {
+            //             component.insertBase64(rst.base64)
+            //         }
+            //     }).catch((err) => {
+            //         this.setUploadError(err.toString())
+            //     })
+            //     return
+            // }
             // 不需要压缩
             // base64
-            if (!config.upload) {
-                const reader = new FileReader()
-                reader.onload = (e) => {
-                    component.insertBase64(e.target.result)
-                }
-                reader.readAsDataURL(file)
-                return
-            }
+            // if (!config.upload) {
+            //     const reader = new FileReader()
+            //     reader.onload = (e) => {
+            //         component.insertBase64(e.target.result)
+            //     }
+            //     reader.readAsDataURL(file)
+            //     return
+            // }
             // 上传服务器
             component.uploadToServer(file)
         },

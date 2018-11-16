@@ -49,9 +49,9 @@ export default {
                 conservativeCollapse: true
             }
         }),
-        commonJs({
-            include: 'node_modules/lrz/**'
-        }),
+        // commonJs({
+        //     include: 'node_modules/lrz/**'
+        // }),
         nodeResolve({jsnext: true}),
         buble({
             include: '**/*.js'
